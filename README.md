@@ -83,7 +83,7 @@ Program Headers:
    01     .sbss .bss
 ```
 
-Now you can see that the executable file has two program headers, one for code and read-only data (``.text`` and ``.rodata``), and the other for data (``.sbss`` and ``.bss``). Also, the flag of the first segment is marked with ``RE`` (Readable and Executable), while that of the second segment is set to ``RW`` (Readable and Writable). During ``exec()``, we can load the content of the first segment into __code__ pages with setting its permission to Read-only, and that of the second segment into another __data__ pages with the Read/Write permission. Sounds complicated? Don't worry! We have already made the necessary changes in the skeleton code for you (see ``exec()`` at ``./kernel/exec.c``).
+Now you can see that the executable file has two program headers, one for code and read-only data (``.text`` and ``.rodata``), and the other for data (``.sbss`` and ``.bss``). Also, the flag of the first segment is marked with ``RE`` (Readable and Executable), while that of the second segment is set to ``RW`` (Readable and Writable). During ``exec()``, we can load the content of the first segment into __code__ pages with setting its permission to Read-only, and that of the second segment into another __data__ pages with the Read/Write permission. Sounds complicated? Don't worry! We have already made the necessary changes in the skeleton code for you (see ``exec()`` and ``loadseg()`` at ``./kernel/exec.c``).
 
 ### What happens to memory during ``fork()`` in ``xv6``
 
@@ -135,11 +135,11 @@ Again, note that we are not using demand paging. For example, when a process wan
 
 ### 3. Make sure there is no memory leak (30 points)
 
-In order to get the full credit in this project, you need to make sure there is no memory leak in your implementation. In the skeleton code, we have added a global variable called ``freemem`` in ``xv6``. The value of ``freemem`` indicates the number of free page frames currently available in the system. It is decremented by 1 when a page frame is allocated in ``kalloc()`` and incremented by 1 when a page frame is freed in ``kfree()``. The current value of ``freemem`` is also displayed when you press ``ctrl-p`` in ``xv6``. We have also added a system call named ``getfreemem()`` which returns the value of ``freemem``. 
+In order to get the full credit in this project, you need to make sure there is no memory leak in your implementation. In the skeleton code, we have added a global variable called ``freemem`` in ``xv6``. The value of ``freemem`` indicates the number of free page frames currently available in the system. It is decremented by 1 when a page frame is allocated in ``kalloc()`` and incremented by 1 when a page frame is freed in ``kfree()``. The current value of ``freemem`` is also displayed when you press ``ctrl-p`` on ``xv6``. We have also added a system call named ``getfreemem()`` which returns the value of ``freemem``. 
 
 Whenever you return to the shell after executing a command, the value of ``freemem`` should remain exactly the same. Otherwise, it means either you forgot to free some page frames or you deallocated some page frames that you shouldn't. 
 
-Before your submission, please make sure your implementation does not have memory leak by running the following programs:
+Before your submission, please make sure your implementation does not have memory leak by monitoring the value of ``freemem`` after running the following programs:
 
 * forktest
 * schedtest1
@@ -162,7 +162,7 @@ You need to prepare and submit the design document (in a single PDF file) for yo
 
 ## Skeleton code
 
-Because we have fixed a bug related to memory leak in the original ``xv6`` source code, we recommend you to download the fresh ``xv6-riscv-snu`` from Github. The skeleton code for this project (PA5) is available as a branch named ``pa5``. 
+Because we made several modifications (including a bug fix) in the ``xv6`` source code, you should download the fresh ``xv6-riscv-snu`` from Github. The skeleton code for this project (PA5) is available as a branch named ``pa5``. 
 
 ```
 $ git clone https://github.com/snu-csl/xv6-riscv-snu
@@ -170,6 +170,91 @@ $ cd xv6-riscv-snu
 $ git checkout pa5
 ```
 After downloading, you have to set your STUDENTID again in the ``Makefile``. 
+
+To help debugging and automatic grading, we have added a system call named ``v2p()`` and the test program called ``v2ptest`` (see ``./user/v2ptest.c``). For the given virtual address, the ``v2p()`` system call returns the beginning address of the corresponding page frame in the physical memory, if any. The ``v2ptest`` program shows the virtual-to-physical address mapping for the variables located in the data, stack, and heap segment using the ``v2p()`` system call.
+
+The following shows the output when you run the ``v2ptest`` program on the skeleton code.
+
+```
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 3G -smp 1 -nographic -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+init: starting sh
+$ ^p
+1 sleep  init
+2 sleep  sh
+freemem = 32572 (pages)
+
+$ v2ptest
+init
+&g: va=0x0000000000001A94 pa=0x0000000087F3F000
+&s: va=0x0000000000003FBC pa=0x0000000087F3D000
+hp: va=0x0000000000004000 pa=0x0000000087F46000
+child: after fork()
+&g: va=0x0000000000001A94 pa=0x0000000087F64000
+&s: va=0x0000000000003FBC pa=0x0000000087F71000
+hp: va=0x0000000000004000 pa=0x0000000087F57000
+child: after g++
+&g: va=0x0000000000001A94 pa=0x0000000087F64000
+&s: va=0x0000000000003FBC pa=0x0000000087F71000
+hp: va=0x0000000000004000 pa=0x0000000087F57000
+child: after *hp='x'
+&g: va=0x0000000000001A94 pa=0x0000000087F64000
+&s: va=0x0000000000003FBC pa=0x0000000087F71000
+hp: va=0x0000000000004000 pa=0x0000000087F57000
+parent: after wait()
+&g: va=0x0000000000001A94 pa=0x0000000087F3F000
+&s: va=0x0000000000003FBC pa=0x0000000087F3D000
+hp: va=0x0000000000004000 pa=0x0000000087F46000
+$ ^p
+1 sleep  init
+2 sleep  sh
+freemem = 32572 (pages)
+```
+
+Once you implement all the requirements of this project successfully, your output should be similar to the following. Note that the actual physical addresses and the value of ``freemem`` can vary depending on your implementation.
+
+```
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 3G -smp 1 -nographic -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+init: starting sh
+$ ^p
+1 sleep  init
+2 sleep  sh
+freemem = 32536 (pages)
+
+$ v2ptest
+init
+&g: va=0x0000000000001A94 pa=0x0000000087F42000
+&s: va=0x0000000000003FBC pa=0x0000000087F40000
+hp: va=0x0000000000004000 pa=0x0000000087F49000
+child: after fork()
+&g: va=0x0000000000001A94 pa=0x0000000087F42000
+&s: va=0x0000000000003FBC pa=0x0000000087F4B000
+hp: va=0x0000000000004000 pa=0x0000000087F49000
+child: after g++
+&g: va=0x0000000000001A94 pa=0x0000000087F4C000
+&s: va=0x0000000000003FBC pa=0x0000000087F4B000
+hp: va=0x0000000000004000 pa=0x0000000087F49000
+child: after *hp='x'
+&g: va=0x0000000000001A94 pa=0x0000000087F4C000
+&s: va=0x0000000000003FBC pa=0x0000000087F4B000
+hp: va=0x0000000000004000 pa=0x0000000087F4D000
+parent: after wait()
+&g: va=0x0000000000001A94 pa=0x0000000087F42000
+&s: va=0x0000000000003FBC pa=0x0000000087F40000
+hp: va=0x0000000000004000 pa=0x0000000087F49000
+$ ^p
+1 sleep  init
+2 sleep  sh
+freemem = 32536 (pages)
+```
+
+You can see that the parent and child process share the same page frames just after the ``fork()`` system call, but as the child process modifies data, the corresponding page frame is COW'ed. You can notice that the physical address of the child's stack (0x87F4B000) is different from that of the parent's stack (0x87F40000) after ``fork()``. This is because the child process writes some data to its stack (hence, COW'ed) at the beginning of the ``printf()`` function as soon as it returns from the ``fork()`` system call.  
+
 
 ## Restrictions
 
