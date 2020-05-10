@@ -59,7 +59,7 @@ Program Headers:
 
 You can see that ``xv6`` programs use only one program section header where all the code (``.text``), read-only data (``.rodata``), and uninitialized data (``.sbss`` and ``.bss``) are stored. For more details, you are kindly invited to read Section 3.8 in the [xv6 book](http://csl.snu.ac.kr/courses/4190.307/2020-1/book-riscv-rev0.pdf).
 
-Modern operating systems use separate program headers for code and data so that they can be loaded into different pages. This allows us to share code pages among the processes generated from the same executable file. This can be done by specifying the ``--no-omagic`` option (instead of ``-N``) in the linker flags ``LDFLAGS``. The following shows the program headers when you build the same ``ls`` program with this linker option:
+Modern operating systems use separate program headers for code and data so that they can be mapped into different pages. This allows us to share code pages among the processes generated from the same executable file. This can be done by specifying the ``--no-omagic`` option (instead of ``-N``) in the linker flags (``LDFLAGS``). The following shows the program headers when you build the same ``ls`` program with this linker option:
 
 ```
 $ riscv64-unknown-elf-ld -z max-page-size=4096 --no-omagic -e main -Ttext 0 -o user/_ls user/ls.o user/ulib.o user/usys.o user/printf.o user/umalloc.o
@@ -83,7 +83,7 @@ Program Headers:
    01     .sbss .bss
 ```
 
-Now you can see that the executable file has two program headers, one for code and read-only data (``.text`` and ``.rodata``), and the other for data (``.sbss`` and ``.bss``). Also, the flag of the first segment is marked with ``RE`` (Readable and Executable), while that of the second segment is set to ``RW`` (Readable and Writable). During ``exec()``, we can load the content of the first segment into __code__ pages with setting its permission to Read-only, and that of the second segment into another __data__ pages with the Read/Write permission. Sounds complicated? Don't worry! We have already made the necessary changes in the skeleton code for you (see ``exec()`` and ``loadseg()`` at ``./kernel/exec.c``).
+Now you can see that the executable file has two program headers, one for code and read-only data (``.text`` and ``.rodata``), and the other for data (``.sbss`` and ``.bss``). Also, the flag of the first segment is marked with ``RE`` (Readable and Executable), while that of the second segment is set to ``RW`` (Readable and Writable). During ``exec()``, we can load the content of the first segment into code pages with setting its permission to Read-only, and that of the second segment into another data pages with the Read/Write permission. Sounds complicated? Don't worry, we have already made the necessary changes in the skeleton code for you (see ``exec()`` and ``loadseg()`` at ``./kernel/exec.c``).
 
 ### What happens to memory during ``fork()`` in ``xv6``
 
@@ -99,7 +99,7 @@ The first task is to make the parent process and child process share the same co
 
 Remember we are NOT using demand paging in this project. When a program is first loaded using the ``exec()`` system call, the whole content of the code and data segments are read from the executable file at once. 
 
-You don't have to consider code segment sharing among the processes that call the ``exec()`` system call for the same executable file. Consider the following example:
+You don't have to consider code segment sharing among the processes that invoke the ``exec()`` system call for the same executable file. Consider the following example:
 
 ```
 $ cat | cat | cat
@@ -113,29 +113,29 @@ $ cat | cat | cat
 7 sleep  cat
 ```
 
-As you can see, the ``sh`` process (PID 2) creates the total five processes (PID 3-7) to handle this command. Each ``cat`` process is first forked from the parent ``sh`` process and then calls the ``exec()`` system call to run the ``cat`` program. Eventually, three processes with PID 4, 6, and 7 will load the code and data image from the same executable file, but you don't have to make them share the single code segment. To summarize, you need to focus on memory sharing across the ``fork()`` system call only.
+As you can see, the ``sh`` process (PID 2) creates the total five processes (PID 3-7) to handle this command. Each ``cat`` process is first forked from the parent ``sh`` process and then calls ``exec()`` to run the ``cat`` program. Eventually, three processes with PID 4, 6, and 7 will load the code and data image from the same executable file, but you don't have to make them share the single code segment. To summarize, you need to focus on memory sharing across the ``fork()`` system call only.
 
 ### 2. Implement copy-on-write on data/stack/heap segment between the parent and child process (40 points)
 
-Unlike code pages, we need to implement copy-on-write for data pages because they can be written by any process. You can implement copy-on-write as follows:
+Unlike code pages, we need to implement copy-on-write (COW) for data pages because they can be written by the parent or the child process. You can implement copy-on-write as follows:
 
 * When a child process is created, map the page frames used by the parent process for data segment, stack segment, and heap segment into the address space of the child process, and then make them Read-only.
 
-* When any of the parent and child process tries to modify the data in those regions, the RISC-V processor will raise a page fault due to the invalid permission on that page (cf. exception code 15: Store/AMO page fault in the above table)
+* When any of the parent and child process tries to modify the data in those regions, the RISC-V processor will raise a page fault due to the invalid permission on that page (cf. exception code 15: Store page fault in the above table)
 
-* In the page fault handler, allocate a new page frame and copy the content of the original page frame into the newly allocated page. 
+* In the page fault handler, allocate a new page frame and copy the content of the original page frame into the newly allocated page frame.
 
-* Modify the page table of the faulting process so that the corresponding PTE can point to the newly allocated page, with allowing the write permission on that page.
+* Modify the page table of the faulting process so that the corresponding PTE can point to the newly allocated page frame, with allowing the write permission on that page.
 
 * As a result of this copy-on-write action, if the original page frame is being mapped by only a single process, give it a write permission too so that there will be no more copy-on-write. 
 
 * Copy-on-write should be performed only for the page in which the page fault occurs. You should not copy the whole page frames that belong to data, stack, or heap segment.
 
-Again, note that we are not using demand paging. For example, when a process wants to grow the heap segment using the ``sbrk()`` system call, ``xv6`` allocates the corresponding page frames immediately at the time of the ``sbrk()`` system call. 
+Again, note that our ``xv6`` does not use demand paging. For example, when a process wants to grow the heap segment using the ``sbrk()`` system call, ``xv6`` allocates the corresponding page frames immediately at the time of the ``sbrk()`` system call. 
 
 ### 3. Make sure there is no memory leak (30 points)
 
-In order to get the full credit in this project, you need to make sure there is no memory leak in your implementation. In the skeleton code, we have added a global variable called ``freemem`` in ``xv6``. The value of ``freemem`` indicates the number of free page frames currently available in the system. It is decremented by 1 when a page frame is allocated in ``kalloc()`` and incremented by 1 when a page frame is freed in ``kfree()``. The current value of ``freemem`` is also displayed when you press ``ctrl-p`` on ``xv6``. We have also added a system call named ``getfreemem()`` which returns the value of ``freemem``. 
+In order to get the full credit in this project, you need to make sure there is no memory leak in your implementation. In the skeleton code, we have added a global variable called ``freemem`` in ``xv6``. The value of ``freemem`` indicates the number of free page frames currently available in the system. It is decremented by 1 when a page frame is allocated in ``kalloc()`` and incremented by 1 when a page frame is freed in ``kfree()``. The current value of ``freemem`` is also displayed when you press ``ctrl-p`` on ``xv6``. We have also added a system call named ``getfreemem()`` which returns the current value of ``freemem``. 
 
 Whenever you return to the shell after executing a command, the value of ``freemem`` should remain exactly the same. Otherwise, it means either you forgot to free some page frames or you deallocated some page frames that you shouldn't. 
 
@@ -154,9 +154,9 @@ Before your submission, please make sure your implementation does not have memor
 You need to prepare and submit the design document (in a single PDF file) for your implementation. Your design document should include the followings:
 
 * Brief summary of modifications you have made
-* How do you get the page fault?
+* How do you receive the page fault?
 * How do you implement code segment sharing?
-* How do you implement copy-on-write?
+* How do you implement copy-on-write on data/stack/heap segment?
 * When is a page frame freed and how?
 * Other things you have considered in your implementation
 
