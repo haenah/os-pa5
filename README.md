@@ -171,6 +171,14 @@ $ git checkout pa5
 ```
 After downloading, you have to set your STUDENTID again in the ``Makefile``. 
 
+## Restrictions
+
+* To make the problem easier, we assume a single-processor machine in this project. The ``CPUS`` variable that represents the number of CPUs in the target QEMU machine emulator is already set to 1 in the ``Makefile``.
+
+* Do not add any system calls.
+
+* You only need to modify those files in the ``./kernel`` directory. Changes to other source code will be ignored during grading.
+
 ## Hand in instructions
 
 * Please remove all the debugging outputs before you submit. 
