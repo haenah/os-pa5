@@ -29,7 +29,7 @@ The RISC-V processor implements a standard paging with the page size of 4KiB. Es
 | 12              | __Instruction page fault__      |
 | 13              | __Load page fault__             |
 | 14              | _Reserved_                      |
-| 15              | __Store/AMO page fault__        |
+| 15              | __Store page fault__        |
 | >= 16           | _Reserved_                      |
 
 Please pay attention to the following three events in the above table: Instruction page fault (12), Load page fault (13) and Store page fault (15). These events indicate the page faults caused by an instruction fetch, a load instruction, or a store instruction, respectively. On a page fault, RISC-V also provides the information on the _virtual_ address that caused the fault using the ``stval`` register. Currently, no page faults occur in ``xv6`` because all the required code and data are resident in the physical memory. However, you will need to handle these page faults in this project. Note that the value of the ``scause`` or ``stval`` registers can be read by calling the ``r_scause()`` or ``r_stval()`` function in ``xv6``, respectively. For more information on the RISC-V paging hardware, please refer to the [RISC-V Privileged Architecture Specification](http://csl.snu.ac.kr/courses/4190.307/2020-1/riscv-privileged-v1.10.pdf).
