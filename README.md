@@ -131,6 +131,11 @@ Unlike code pages, we need to implement copy-on-write (COW) for data pages becau
 
 * Copy-on-write should be performed only for the page in which the page fault occurs. You should not copy the whole page frames that belong to data, stack, or heap segment.
 
+You also need to handle invalid memory accesses from a process. In the following cases, the process that caused the page fault should be terminated.
+
+* When a process tries to access an invalid virtual address region
+* When a process tries to write data to the code segment
+
 Again, note that our ``xv6`` does not use demand paging. For example, when a process wants to grow the heap segment using the ``sbrk()`` system call, ``xv6`` allocates the corresponding page frames immediately at the time of the ``sbrk()`` system call. 
 
 ### 3. Make sure there is no memory leak (30 points)
