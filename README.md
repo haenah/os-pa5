@@ -95,7 +95,7 @@ The ``fork()`` system call creates a new (child) process by duplicating the call
 
 ### 1. Share the code segment between the parent and child process across ``fork()`` (25 points)
 
-The first task is to make the parent process and child process share the same code segment across the ``fork()`` system call. Each page in the code segment is set to Read-only, so there is no problem when the corresponding page frame is mapped to multiple processes. Note that the parent process can fork multiple child processes and each child process also can fork another processes. You should make sure the page frames in the physical memory are released only when the last process that shares the code segment exits. 
+The first task is to make the parent process and child process share the same code segment across the ``fork()`` system call. Each page in the code segment is set to Read-only, so there is no problem when the corresponding page frames are mapped to multiple processes. Note that the parent process can fork multiple child processes and each child process also can fork another processes. You should make sure the page frames in the physical memory are released only when the last process that shares the code segment exits. 
 
 Remember we are NOT using demand paging in this project. When a program is first loaded using the ``exec()`` system call, the whole content of the code and data segments are read from the executable file at once. 
 
@@ -121,7 +121,7 @@ Unlike code pages, we need to implement copy-on-write (COW) for data pages becau
 
 * When a child process is created, map the page frames used by the parent process for data segment, stack segment, and heap segment into the address space of the child process, and then make them Read-only.
 
-* When any of the parent and child process tries to modify the data in those regions, the RISC-V processor will raise a page fault due to the invalid permission on that page (cf. exception code 15: Store page fault in the above table)
+* When any of the parent and child process tries to modify the data in those segments, the RISC-V processor will raise a page fault due to the invalid permission on that page (cf. exception code 15: Store page fault in the above table)
 
 * In the page fault handler, allocate a new page frame and copy the content of the original page frame into the newly allocated page frame.
 
@@ -159,10 +159,10 @@ Before your submission, please make sure your implementation does not have memor
 You need to prepare and submit the design document (in a single PDF file) for your implementation. Your design document should include the followings:
 
 * Brief summary of modifications you have made
-* How do you receive the page fault?
+* How do you catch the page fault?
 * How do you implement code segment sharing?
 * How do you implement copy-on-write on data/stack/heap segment?
-* When is a page frame freed and how?
+* When is a page frame released and how?
 * Other things you have considered in your implementation
 
 ## Skeleton code
@@ -265,7 +265,7 @@ You can see that the parent and child process share the same page frames just af
 
 * To make the problem easier, we assume a single-processor machine in this project. The ``CPUS`` variable that represents the number of CPUs in the target QEMU machine emulator is already set to 1 in the ``Makefile``.
 
-* Do not add any system calls.
+* Do not add any other system calls.
 
 * You only need to modify those files in the ``./kernel`` directory. Changes to other source code will be ignored during grading.
 
